@@ -15,12 +15,12 @@ class RNNPhonemeClassifier(object):
         self.num_layers = num_layers
 
         # TODO: Understand then uncomment this code :)
-        # self.rnn = [
-        #     RNNCell(input_size, hidden_size) if i == 0 
-        #         else RNNCell(hidden_size, hidden_size)
-        #             for i in range(num_layers)
-        # ]
-        # self.output_layer = Linear(hidden_size, output_size)
+        self.rnn = [
+            RNNCell(input_size, hidden_size) if i == 0 
+                else RNNCell(hidden_size, hidden_size)
+                    for i in range(num_layers)
+        ]
+        self.output_layer = Linear(hidden_size, output_size)
 
         # store hidden states at each time step, [(seq_len+1) * (num_layers, batch_size, hidden_size)]
         self.hiddens = []
@@ -78,6 +78,8 @@ class RNNPhonemeClassifier(object):
         # Save x and append the hidden vector to the hiddens list
         self.x = x
         self.hiddens.append(hidden.copy())
+        # QUOTE store hidden states at each time step, [(seq_len+1) * (num_layers, batch_size, hidden_size)]
+
         logits = None
 
         ### Add your code here --->
@@ -88,13 +90,19 @@ class RNNPhonemeClassifier(object):
         #       the parameters as needed. Update hidden.
         #   Similar to above, append a copy of the current hidden array to the hiddens list
         
-        # TODO
+        for i in range(seq_len): #0-9
+            for k in range(len(self.rnn)):
+                if k == 0:
+                    hidden[k] = self.rnn[k].forward(x=x[:,i,:], h_prev_t=hidden[k]) #h_prev_t should be Nxhidden size
+                else:
+                    hidden[k] = self.rnn[k].forward(x=hidden[k-1], h_prev_t=hidden[k]) #h_prev_t should be Nxhidden size
+            self.hiddens.append(hidden.copy())
+        logits = self.output_layer.forward(self.hiddens[-1][-1])
 
         # Get the outputs from the last time step using the linear layer and return it
         # <--------------------------
         
-        # return logits 
-        raise NotImplementedError
+        return logits 
 
     def backward(self, delta):
         """RNN Back Propagation Through Time (BPTT).
@@ -142,7 +150,16 @@ class RNNPhonemeClassifier(object):
         Tip: You may or may not require += at places. Think about it and code
 
         """
-        # TODO
-
-        # return dh / batch_size
-        raise NotImplementedError
+        #self.hiddens is [(seq_len+1) * (num_layers, batch_size, hidden_size)] (0th is h_0)
+        #indexing through time is 1-indexed! We start at seq_len and end at t=1
+        for t in range(seq_len, 0, -1):
+            for l in range(len(self.rnn)-1, -1, -1):
+                h_prev_l = (self.x[:,t-1,:]) if l == 0 else (self.hiddens[t][l-1])
+                h_prev_t = self.hiddens[t-1][l]
+                h_t = self.hiddens[t][l]
+                delta = dh[l]
+                (dx,dh_t_prev) = self.rnn[l].backward(delta, h_t, h_prev_l, h_prev_t)
+                dh[l] = dh_t_prev
+                if l > 0:
+                    dh[l-1] += dx
+        return dh / batch_size

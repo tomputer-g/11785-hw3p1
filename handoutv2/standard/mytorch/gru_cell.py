@@ -189,7 +189,8 @@ class GRUCell(object):
         assert self.dbnh.shape == (self.h,)
         
         dx = dldn_act @ self.Wnx + dldz_act @ self.Wzx + dldr_act @ self.Wrx
-        dh_prev_t = dldh * self.z + dldn_act @ (self.r * self.Wnh) + dldz_act @ self.Wzh + dldr_act @ self.Wrh
+        # self.n = self.h_act.forward((self.r * (self.Wnh @ h_prev_t)))
+        dh_prev_t = dldh * self.z + dldn_act * self.r @ self.Wnh + dldz_act @ self.Wzh + dldr_act @ self.Wrh
         # 4) Know that the autograder grades the gradients in a certain order, and the
         #    local autograder will tell you which gradient you are currently failing.
         

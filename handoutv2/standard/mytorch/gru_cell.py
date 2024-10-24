@@ -86,10 +86,16 @@ class GRUCell(object):
         """
         self.x = x
         self.hidden = h_prev_t
-
+        h_t = np.zeros_like(h_prev_t)
         # Add your code here.
         # Define your variables based on the writeup using the corresponding
         # names below.
+        
+        #store:  r, z, n
+        self.r = self.r_act.forward(self.Wrx @ self.x + self.brx + self.Wrh @ h_prev_t + self.brh)
+        self.z = self.z_act.forward(self.Wzx @ self.x + self.bzx + self.Wzh @ h_prev_t + self.bzh)
+        self.n = self.h_act.forward(self.Wnx @ self.x + self.bnx + (self.r * (self.Wnh @ h_prev_t + self.bnh)))
+        h_t = (1 - self.z) * self.n + self.z * h_prev_t
 
         assert self.x.shape == (self.d,)
         assert self.hidden.shape == (self.h,)
@@ -99,8 +105,7 @@ class GRUCell(object):
         assert self.n.shape == (self.h,)
         assert h_t.shape == (self.h,)  # h_t is the final output of you GRU cell.
 
-        # return h_t
-        raise NotImplementedError
+        return h_t
 
     def backward(self, delta):
         """GRU cell backward.

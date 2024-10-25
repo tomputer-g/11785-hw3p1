@@ -51,9 +51,31 @@ class GreedySearchDecoder(object):
         # 3. update path probability, by multiplying with the current max probability
         # 4. Select most probable symbol and append to decoded_path
         # 5. Compress sequence (Inside or outside the loop)
-
-        #return decoded_path, path_prob
-        raise NotImplementedError
+        B = y_probs.shape[2]
+        
+        for t in range(len(y_probs[0])):
+            max_r = -1
+            max_prob = 0
+            for r in range(len(y_probs)):
+                if y_probs[r, t, 0] > max_prob:
+                    max_prob = y_probs[r,t,0]
+                    max_r = r
+            if max_r == blank:
+                decoded_path.append("BLANK")
+            else:
+                decoded_path.append(self.symbol_set[max_r-1])
+            path_prob *= max_prob
+            
+        #Compress 
+        ptr = len(decoded_path)-1
+        while ptr > 0:
+            if decoded_path[ptr] == decoded_path[ptr-1]:
+                del decoded_path[ptr]
+            ptr -= 1
+        decoded_nonblank = list(filter(("BLANK").__ne__, decoded_path))
+        result = ''.join(decoded_nonblank)
+        
+        return result, path_prob
 
 
 class BeamSearchDecoder(object):

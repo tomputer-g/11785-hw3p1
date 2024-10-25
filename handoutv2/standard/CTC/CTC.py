@@ -311,18 +311,9 @@ class CTCLoss(object):
         logits [np.array, dim=(seqlength, batch_size, len(Symbols)]:
 			log probabilities (output sequence) from the RNN/GRU
 
-        target [np.array, dim=(batch_size, padded_target_len)]:
-            target sequences
-
-        input_lengths [np.array, dim=(batch_size,)]:
-            lengths of the inputs
-
-        target_lengths [np.array, dim=(batch_size,)]:
-            lengths of the target
-
         Returns
         -------
-        dY [np.array, dim=(seq_length, batch_size, len(extended_symbols))]:
+        dY [np.array, dim=(seq_length, batch_size, len(Symbols))]:
             derivative of divergence w.r.t the input symbols at each time
 
         """
@@ -332,6 +323,7 @@ class CTCLoss(object):
         dY = np.full_like(self.logits, 0)
 
         for batch_itr in range(B):
+            print("Batch " + str(batch_itr))
             # -------------------------------------------->
             # Computing CTC Derivative for single batch
             # Process:
@@ -340,21 +332,12 @@ class CTCLoss(object):
             #     Extend target sequence with blank
             #     Compute derivative of divergence and store them in dY
             # <---------------------------------------------
-            # #1)
-            # target_i = target[batch_itr][:target_lengths[batch_itr]]
-            # #2)
-            # logits_i = logits[batch_itr][:input_lengths[batch_itr]]
-            # #3)
-            # extSymbols, skipConnect = self.ctc.extend_target_with_blank(target_i)
-            # #4)
-            # alpha = self.ctc.get_forward_probs(logits_i, extSymbols, skipConnect)
-            # #5)
-            # beta = self.ctc.get_backward_probs(logits_i, extSymbols, skipConnect)
-            # #6)
-            # gamma = self.ctc.get_posterior_probs(alpha, beta)
-            # #7)
-            for t in range(T):
-                for i in range(C):
-                    dy[t, extSymbols[i]] -= gamma[t,i] / logits_i[t, extSymbols[i]]
-
+            logits_i = self.logits[:self.input_lengths[batch_itr],batch_itr,:]
+            gamma = self.gammas[batch_itr]
+            extSymbols = self.extended_symbols[batch_itr]
+            T_i = self.input_lengths[batch_itr]
+            
+            for t in range(T_i):
+                for i in range(len(extSymbols)): #length of symbol sequence
+                    dY[t, batch_itr, extSymbols[i]] -= gamma[t, i] / logits_i[t, extSymbols[i]]
         return dY

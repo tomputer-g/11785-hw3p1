@@ -252,30 +252,50 @@ class CTCLoss(object):
         B, _ = target.shape
         total_loss = np.zeros(B)
         self.extended_symbols = []
-
+        # print(B)
         for batch_itr in range(B):
             # -------------------------------------------->
             # Computing CTC Loss for single batch
             # Process:
-            #     Truncate the target to target length
-            #     Truncate the logits to input length
-            #     Extend target sequence with blank
-            #     Compute forward probabilities
-            #     Compute backward probabilities
-            #     Compute posteriors using total probability function
-            #     Compute expected divergence for each batch and store it in totalLoss
-            #     Take an average over all batches and return final result
+            # 1    Truncate the target to target length
+            # 2    Truncate the logits to input length
+            # 3    Extend target sequence with blank
+            # 4    Compute forward probabilities
+            # 5   Compute backward probabilities
+            # 6   Compute posteriors using total probability function
+            # 7   Compute expected divergence for each batch and store it in totalLoss
+            # 8   Take an average over all batches and return final result
             # <---------------------------------------------
-
-            # -------------------------------------------->
-            # TODO
-            # <---------------------------------------------
-            pass
-
-        total_loss = np.sum(total_loss) / B
-		
-        # return total_loss
-        raise NotImplementedError
+            # print(B) #12
+            #1)
+            target_i = target[batch_itr,:target_lengths[batch_itr]]
+            #2)
+            # print(logits.shape)
+            logits_i = logits[:input_lengths[batch_itr],batch_itr,:]
+            
+            #3)
+            extSymbols, skipConnect = self.ctc.extend_target_with_blank(target_i)
+            #4)
+            alpha = self.ctc.get_forward_probs(logits_i, extSymbols, skipConnect)
+            #5)
+            beta = self.ctc.get_backward_probs(logits_i, extSymbols, skipConnect)
+            #6)
+            gamma = self.ctc.get_posterior_probs(alpha, beta)
+            self.gammas.append(gamma)
+            self.extended_symbols.append(extSymbols)
+            #7)
+            # print(target_i.shape)
+            # print(logits_i.shape)
+            # print(extSymbols)
+            # print(skipConnect)
+            # print(gamma.shape)
+            # print(target_i)
+            for t in range(gamma.shape[0]):
+                for r in range(gamma.shape[1]):
+                    total_loss[batch_itr] += gamma[t][r] * np.log(logits_i[t,extSymbols[r]])
+        #8)
+        total_loss = -np.sum(total_loss) / B
+        return total_loss
 		
 
     def backward(self):
@@ -320,11 +340,21 @@ class CTCLoss(object):
             #     Extend target sequence with blank
             #     Compute derivative of divergence and store them in dY
             # <---------------------------------------------
+            # #1)
+            # target_i = target[batch_itr][:target_lengths[batch_itr]]
+            # #2)
+            # logits_i = logits[batch_itr][:input_lengths[batch_itr]]
+            # #3)
+            # extSymbols, skipConnect = self.ctc.extend_target_with_blank(target_i)
+            # #4)
+            # alpha = self.ctc.get_forward_probs(logits_i, extSymbols, skipConnect)
+            # #5)
+            # beta = self.ctc.get_backward_probs(logits_i, extSymbols, skipConnect)
+            # #6)
+            # gamma = self.ctc.get_posterior_probs(alpha, beta)
+            # #7)
+            for t in range(T):
+                for i in range(C):
+                    dy[t, extSymbols[i]] -= gamma[t,i] / logits_i[t, extSymbols[i]]
 
-            # -------------------------------------------->
-            # TODO
-            # <---------------------------------------------
-            pass
-
-        # return dY
-        raise NotImplementedError
+        return dY

@@ -22,21 +22,21 @@ class CTC(object):
 	def extend_target_with_blank(self, target):
 		"""Extend target sequence with blank.
 
-        Input
-        -----
-        target: (np.array, dim = (target_len,))
-                target output
-        ex: [B,IY,IY,F]
+		Input
+		-----
+		target: (np.array, dim = (target_len,))
+				target output
+		ex: [B,IY,IY,F]
 
-        Return
-        ------
-        extSymbols: (np.array, dim = (2 * target_len + 1,))
-                    extended target sequence with blanks
-        ex: [-,B,-,IY,-,IY,-,F,-]
+		Return
+		------
+		extSymbols: (np.array, dim = (2 * target_len + 1,))
+					extended target sequence with blanks
+		ex: [-,B,-,IY,-,IY,-,F,-]
 
-        skipConnect: (np.array, dim = (2 * target_len + 1,))
-                    skip connections
-        ex: [0,0,0,1,0,0,0,1,0]
+		skipConnect: (np.array, dim = (2 * target_len + 1,))
+					skip connections
+		ex: [0,0,0,1,0 ,0,0,1,0]
 		"""
 
 		extended_symbols = [self.BLANK]
@@ -46,15 +46,14 @@ class CTC(object):
 
 		N = len(extended_symbols)
 
-		# -------------------------------------------->
-		# TODO
-		# <---------------------------------------------
-
+		skip_connect = np.zeros_like(extended_symbols)
+		for i in range(1, len(extended_symbols)-1):
+			if extended_symbols[i] == self.BLANK and extended_symbols[i-1] != extended_symbols[i+1]:
+				skip_connect[i+1] = 1
 		extended_symbols = np.array(extended_symbols).reshape((N,))
 		skip_connect = np.array(skip_connect).reshape((N,))
 
-		# return extended_symbols, skip_connect
-		raise NotImplementedError
+		return extended_symbols, skip_connect
 
 
 	def get_forward_probs(self, logits, extended_symbols, skip_connect):
@@ -90,9 +89,16 @@ class CTC(object):
 		# TODO: Compute all values for alpha[t][sym] where 1 <= t < T and 1 <= sym < S (assuming zero-indexing)
         # IMP: Remember to check for skipConnect when calculating alpha
 		# <---------------------------------------------
-
-		# return alpha
-		raise NotImplementedError
+		alpha[0][0] = logits[0, extended_symbols[0]]
+		alpha[0][1] = logits[0, extended_symbols[1]]
+		for t in range(1, T):
+			alpha[t][0] = alpha[t-1][0] * logits[t, extended_symbols[0]]
+			for r in range(1, S):
+				alpha[t][r] = alpha[t-1][r] + alpha[t-1][r-1]
+				if skip_connect[r]:
+					alpha[t][r] += alpha[t-1][r-2]
+				alpha[t][r] *= logits[t, extended_symbols[r]]
+		return alpha
 
 
 	def get_backward_probs(self, logits, extended_symbols, skip_connect):
@@ -122,12 +128,31 @@ class CTC(object):
 		S, T = len(extended_symbols), len(logits)
 		beta = np.zeros(shape=(T, S))
 
-		# -------------------------------------------->
-		# TODO
-		# <--------------------------------------------
+		# alpha[0][0] = logits[0, extended_symbols[0]]
+		# alpha[0][1] = logits[0, extended_symbols[1]]
+		# for t in range(1, T):
+		# 	alpha[t][0] = alpha[t-1][0] * logits[t, extended_symbols[0]]
+		# 	for r in range(1, S):
+		# 		alpha[t][r] = alpha[t-1][r] + alpha[t-1][r-1]
+		# 		if skip_connect[r]:
+		# 			alpha[t][r] += alpha[t-1][r-2]
+		# 		alpha[t][r] *= logits[t, extended_symbols[r]]
+		# return alpha
 
-		# return beta
-		raise NotImplementedError
+		#beta is actually betahat until we divide everything by logits
+		beta[T-1][S-1] = logits[T-1, extended_symbols[S-1]]
+		beta[T-1][S-2] = logits[T-1, extended_symbols[S-2]]
+		for t in range(T-2, -1, -1):
+			beta[t][S-1] = beta[t+1][S-1] * logits[t, extended_symbols[S-1]]
+			for r in range(S-2, -1, -1):
+				beta[t][r] = beta[t+1][r] + beta[t+1][r+1]
+				if r+2 < S and skip_connect[r+2]:
+					beta[t][r] += beta[t+1][r+2]
+				beta[t][r] *= logits[t, extended_symbols[r]]
+		for t in range(len(beta)):
+			for r in range(len(beta[0])):
+				beta[t][r] /= logits[t, extended_symbols[r]]
+		return beta
 		
 
 	def get_posterior_probs(self, alpha, beta):
@@ -152,12 +177,12 @@ class CTC(object):
 		gamma = np.zeros(shape=(T, S))
 		sumgamma = np.zeros((T,))
 
-		# -------------------------------------------->
-		# TODO
-		# <---------------------------------------------
-
-		# return gamma
-		raise NotImplementedError
+		for t in range(T):
+			for r in range(S):
+				gamma[t][r] = alpha[t][r] * beta[t][r]
+				sumgamma[t] += gamma[t][r]
+			gamma[t,:] /= sumgamma[t]
+		return gamma
 
 
 class CTCLoss(object):

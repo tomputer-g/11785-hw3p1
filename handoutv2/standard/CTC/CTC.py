@@ -323,7 +323,6 @@ class CTCLoss(object):
         dY = np.full_like(self.logits, 0)
 
         for batch_itr in range(B):
-            print("Batch " + str(batch_itr))
             # -------------------------------------------->
             # Computing CTC Derivative for single batch
             # Process:
